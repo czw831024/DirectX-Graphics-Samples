@@ -66,6 +66,8 @@ namespace FallbackLayer
 
         ScratchMemoryPartitions CalculateScratchMemoryUsage(Level level, UINT numTriangles);
 
+        bool m_updateAllowed;
+
         SceneAABBCalculator m_sceneAABBCalculator;
         MortonCodesCalculator m_mortonCodeCalculator;
         BitonicSort m_sorterPass;

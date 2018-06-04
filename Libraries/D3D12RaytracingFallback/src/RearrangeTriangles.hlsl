@@ -20,6 +20,7 @@ void CopyPrimitive(uint srcIndex, uint dstIndex)
 {
     OutputTriangleBuffer[dstIndex] = InputTriangleBuffer[srcIndex];
     OutputMetadataBuffer[dstIndex] = InputMetadataBuffer[srcIndex];
+    OutputMetadataBuffer[dstIndex].PresortIndex = srcIndex;
 }
 
 [numthreads(THREAD_GROUP_1D_WIDTH, 1, 1)]

@@ -56,7 +56,8 @@ namespace FallbackLayer
         const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC &buildDesc, 
         const UINT totalPrimitiveCount,
         D3D12_GPU_VIRTUAL_ADDRESS outputTriangleBuffer,
-        D3D12_GPU_VIRTUAL_ADDRESS outputMetadataBuffer)
+        D3D12_GPU_VIRTUAL_ADDRESS outputMetadataBuffer,
+        const bool performUpdate)
     {
         CComPtr<ID3D12Device> pDevice;
         pCommandList->GetDevice(IID_PPV_ARGS(&pDevice));
@@ -102,6 +103,7 @@ namespace FallbackLayer
                 constants.GeometryContributionToHitGroupIndex = elementIndex;
                 constants.HasValidTransform = (triangles.Transform != 0);
                 constants.GeometryFlags = geometryDesc.Flags;
+                constants.PerformUpdate = performUpdate;
 
                 pCommandList->SetComputeRoot32BitConstants(InputRootConstants, SizeOfInUint32(LoadPrimitivesInputConstants), &constants, 0);
                 pCommandList->SetComputeRootShaderResourceView(ElementBufferSRV, triangles.VertexBuffer.StartAddress);
@@ -140,6 +142,7 @@ namespace FallbackLayer
                 constants.ElementBufferStride = (UINT32)aabbs.AABBs.StrideInBytes;
                 constants.GeometryContributionToHitGroupIndex = elementIndex;
                 constants.GeometryFlags = geometryDesc.Flags;
+                constants.PerformUpdate = performUpdate;
 
                 pCommandList->SetComputeRoot32BitConstants(InputRootConstants, SizeOfInUint32(LoadPrimitivesInputConstants), &constants, 0);
                 pCommandList->SetComputeRootShaderResourceView(ElementBufferSRV, aabbs.AABBs.StartAddress);

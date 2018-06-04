@@ -30,6 +30,7 @@ struct LoadPrimitivesInputConstants
     // TODO: Consider inlining into separate shaders
     uint HasValidTransform; 
     uint GeometryFlags;
+    uint PerformUpdate;
 };
 
 // UAVs
@@ -57,12 +58,25 @@ cbuffer LoadPrimitivesConstants : CONSTANT_REGISTER(LoadInstancesConstantsRegist
     LoadPrimitivesInputConstants Constants;
 }
 
-void StorePrimitiveMetadata(uint globalPrimitiveIndex, uint localPrimitiveIndex)
+uint GetSortedIndex(uint globalPrimitiveIndex) 
+{
+    for(uint i = Constants.PrimitiveOffset; i < Constants.PrimitiveOffset + Constants.NumPrimitivesBound; i++) 
+    {
+        if (MetadataBuffer[i].PresortIndex == globalPrimitiveIndex) 
+        {
+            return i;
+        }
+    }
+    return 0;
+}
+
+void StorePrimitiveMetadata(uint globalPrimitiveIndex, uint localPrimitiveIndex, uint presortIndex)
 {
     PrimitiveMetaData metaData;
     metaData.GeometryContributionToHitGroupIndex = Constants.GeometryContributionToHitGroupIndex;
     metaData.PrimitiveIndex = localPrimitiveIndex;
     metaData.GeometryFlags = Constants.GeometryFlags;
+    metaData.PresortIndex = Constants.PerformUpdate * presortIndex;
     MetadataBuffer[globalPrimitiveIndex] = metaData;
 }
 #endif

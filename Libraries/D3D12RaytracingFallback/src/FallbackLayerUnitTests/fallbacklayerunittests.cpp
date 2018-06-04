@@ -2382,6 +2382,7 @@ namespace FallbackLayerUnitTests
                         metadata.GeometryContributionToHitGroupIndex = 0;
                         metadata.PrimitiveIndex = i;
                         metadata.GeometryFlags = 0;
+                        metadata.PresortIndex = 0;
                         trianglesMetadata.push_back(metadata);
                     }
                 }
@@ -2874,7 +2875,8 @@ namespace FallbackLayerUnitTests
                 buildDesc,
                 totalPrimCount,
                 pOutputBuffer->GetGPUVirtualAddress(),
-                pOutputMetadataBuffer->GetGPUVirtualAddress());
+                pOutputMetadataBuffer->GetGPUVirtualAddress(),
+                false);
 
             pCommandList->Close();
             m_d3d12Context.ExecuteCommandList(pCommandList);
@@ -2940,6 +2942,8 @@ namespace FallbackLayerUnitTests
                         IsFloatArrayEqual((float*)&inputTri, (float *)&pOutputTriangles[outputIndex], 9),
                         L"Triangles in output buffers not correctly in reverse order");
 
+                    Assert::IsTrue(inputIndex == pOutputPrimitiveMetaData[outputIndex].PresortIndex, L"Metadata pre-sort index not correctly assigned");
+                    pInputPrimitiveMetaData[inputIndex].PresortIndex = pOutputPrimitiveMetaData[outputIndex].PresortIndex;
                     Assert::IsTrue(
                         memcmp(&pInputPrimitiveMetaData[inputIndex], &pOutputPrimitiveMetaData[outputIndex], sizeof(*pInputPrimitiveMetaData)) == 0,
                         L"Metadata in output buffers not correctly in reverse order");

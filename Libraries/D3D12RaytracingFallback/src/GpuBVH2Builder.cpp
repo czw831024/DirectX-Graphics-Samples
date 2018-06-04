@@ -63,6 +63,10 @@ namespace FallbackLayer
         }
 #endif
 
+        if (pDesc->Flags & D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE) {
+            m_updateAllowed = true;
+        }
+
         switch (pDesc->Type)
         {
         case D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL:
@@ -165,14 +169,44 @@ namespace FallbackLayer
         D3D12_GPU_VIRTUAL_ADDRESS calculateAABBScratchBuffer = scratchGpuVA + scratchMemoryPartition.OffsetToCalculateAABBDispatchArgs;
         D3D12_GPU_VIRTUAL_ADDRESS nodeCountBuffer = scratchGpuVA + scratchMemoryPartition.OffsetToPerNodeCounter;
 
-        const SceneType sceneType = SceneType::Triangles;
-        m_loadPrimitivesPass.LoadPrimitives(pCommandList, *pDesc, totalTriangles, scratchTriangleBuffer, scratchMetadataBuffer);
-        m_sceneAABBCalculator.CalculateSceneAABB(pCommandList, sceneType, scratchTriangleBuffer, totalTriangles, sceneAABBScratchMemory, sceneAABB);
-        m_mortonCodeCalculator.CalculateMortonCodes(pCommandList, sceneType, scratchTriangleBuffer, totalTriangles, sceneAABB, indexBuffer, mortonCodeBuffer);
-        m_sorterPass.Sort(pCommandList, mortonCodeBuffer, indexBuffer, totalTriangles, false, true);
-
         D3D12_GPU_VIRTUAL_ADDRESS outputTriangleBuffer = pDesc->DestAccelerationStructureData.StartAddress + GetOffsetToPrimitives(totalTriangles);
         D3D12_GPU_VIRTUAL_ADDRESS outputMetadataBuffer = outputTriangleBuffer + GetOffsetFromPrimitivesToPrimitiveMetaData(totalTriangles);
+
+        const SceneType sceneType = SceneType::Triangles;
+
+        const bool shouldPerformUpdate = m_updateAllowed && pDesc->Flags & D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
+        m_loadPrimitivesPass.LoadPrimitives(
+            pCommandList, 
+            *pDesc, 
+            totalTriangles, 
+            shouldPerformUpdate ? outputTriangleBuffer : scratchTriangleBuffer, 
+            shouldPerformUpdate ? outputMetadataBuffer : scratchMetadataBuffer, 
+            shouldPerformUpdate);
+        
+        m_sceneAABBCalculator.CalculateSceneAABB(
+            pCommandList, 
+            sceneType, 
+            scratchTriangleBuffer, 
+            totalTriangles, 
+            sceneAABBScratchMemory, 
+            sceneAABB);
+
+        m_mortonCodeCalculator.CalculateMortonCodes(
+            pCommandList, 
+            sceneType, 
+            scratchTriangleBuffer, 
+            totalTriangles, 
+            sceneAABB, 
+            indexBuffer, 
+            mortonCodeBuffer);
+
+        m_sorterPass.Sort(
+            pCommandList, 
+            mortonCodeBuffer, 
+            indexBuffer, 
+            totalTriangles, 
+            false, 
+            true);
 
         m_rearrangePass.Rearrange(
             pCommandList,
