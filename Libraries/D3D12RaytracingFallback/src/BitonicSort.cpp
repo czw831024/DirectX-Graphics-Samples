@@ -49,10 +49,10 @@ BitonicSort::BitonicSort(ID3D12Device *pDevice, UINT nodeMask)
     auto rootSignatureDesc = CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC(ARRAYSIZE(parameters), parameters);
     CreateRootSignatureHelper(pDevice, rootSignatureDesc, &m_pRootSignature);
 
-    CreatePSOHelper(pDevice, nodeMask, m_pRootSignature, COMPILED_SHADER(g_pBitonicIndirectArgsCS),&m_pBitonicIndirectArgsCS);
-    CreatePSOHelper(pDevice, nodeMask, m_pRootSignature, COMPILED_SHADER(g_pBitonicInnerSortCS), &m_pBitonicInnerSortCS);
-    CreatePSOHelper(pDevice, nodeMask, m_pRootSignature, COMPILED_SHADER(g_pBitonicOuterSortCS), &m_pBitonicOuterSortCS);
-    CreatePSOHelper(pDevice, nodeMask, m_pRootSignature, COMPILED_SHADER(g_pBitonicPreSortCS),   &m_pBitonicPreSortCS);
+    CreatePSOHelper(pDevice, nodeMask, m_pRootSignature, COMPILED_SHADER(g_pBitonicIndirectArgsCS), &m_pBitonicIndirectArgsCS);
+    CreatePSOHelper(pDevice, nodeMask, m_pRootSignature, COMPILED_SHADER(g_pBitonicInnerSortCS),    &m_pBitonicInnerSortCS);
+    CreatePSOHelper(pDevice, nodeMask, m_pRootSignature, COMPILED_SHADER(g_pBitonicOuterSortCS),    &m_pBitonicOuterSortCS);
+    CreatePSOHelper(pDevice, nodeMask, m_pRootSignature, COMPILED_SHADER(g_pBitonicPreSortCS),      &m_pBitonicPreSortCS);
     
     D3D12_INDIRECT_ARGUMENT_DESC indirectArgDesc = {};
     indirectArgDesc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH;
