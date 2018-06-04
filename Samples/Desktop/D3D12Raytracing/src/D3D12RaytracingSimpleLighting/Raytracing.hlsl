@@ -157,6 +157,10 @@ void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
     float4 diffuseColor = CalculateDiffuseLighting(hitPosition, triangleNormal);
     float4 color = g_sceneCB.lightAmbientColor + diffuseColor;
 
+    if (int(abs(hitPosition.x) > 0.96) + int(abs(hitPosition.y) > 0.96) + int(abs(hitPosition.z) > 0.96) >= 2) {
+        color *= 0.1;
+    }
+
     payload.color = color;
 }
 

@@ -260,6 +260,8 @@ void MyClosestHitShader_AABB(inout RayPayload rayPayload, in ProceduralPrimitive
     float t = RayTCurrent();
     color = lerp(color, BackgroundColor, 1.0 - exp(-0.000002*t*t*t));
 
+    color = float4(int(color.x * 6) / 6.0, int(color.y * 6) / 6.0, int(color.z * 6) / 6.0, 1);
+
     rayPayload.color = color;
 }
 
