@@ -790,7 +790,7 @@ AccelerationStructureBuffers D3D12RaytracingProceduralGeometry::BuildBottomLevel
     D3D12_GET_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO_DESC prebuildInfoDesc = {};
     prebuildInfoDesc.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
     prebuildInfoDesc.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-    prebuildInfoDesc.Flags = buildFlags;
+    prebuildInfoDesc.Flags = buildFlags | D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
     prebuildInfoDesc.NumDescs = static_cast<UINT>(geometryDescs.size());
     prebuildInfoDesc.pGeometryDescs = geometryDescs.data();
 
@@ -926,7 +926,7 @@ AccelerationStructureBuffers D3D12RaytracingProceduralGeometry::BuildTopLevelAS(
     D3D12_GET_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO_DESC prebuildInfoDesc = {};
     prebuildInfoDesc.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
     prebuildInfoDesc.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-    prebuildInfoDesc.Flags = buildFlags;
+    prebuildInfoDesc.Flags = buildFlags | D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
     prebuildInfoDesc.NumDescs = NUM_BLAS;
 
     D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO topLevelPrebuildInfo = {};
