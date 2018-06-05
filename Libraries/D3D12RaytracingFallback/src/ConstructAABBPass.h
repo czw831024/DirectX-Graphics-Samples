@@ -21,8 +21,8 @@ namespace FallbackLayer
             D3D12_GPU_VIRTUAL_ADDRESS outputVH,
             D3D12_GPU_VIRTUAL_ADDRESS scratchBuffer,
             D3D12_GPU_VIRTUAL_ADDRESS childNodesProcessedCountBuffer,
-            D3D12_GPU_VIRTUAL_ADDRESS mortonCodeBuffer,
             D3D12_GPU_VIRTUAL_ADDRESS hierarchyBuffer,
+            D3D12_GPU_VIRTUAL_ADDRESS outputAABBParentBuffer,
             D3D12_GPU_DESCRIPTOR_HANDLE globalDescriptorHeap,
             UINT numElements);
     private:
@@ -31,8 +31,8 @@ namespace FallbackLayer
             OutputBVHRootUAVParam = 0,
             ScratchUAVParam,
             HierarchyUAVParam,
+            AABBParentBufferParam,
             ChildNodesProcessedCountBufferParam,
-            MortonCodesBufferParam,
             InputRootConstants,
             GlobalDescriptorHeap,
             NumRootParameters,

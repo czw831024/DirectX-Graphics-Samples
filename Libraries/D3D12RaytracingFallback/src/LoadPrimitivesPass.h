@@ -20,7 +20,7 @@ namespace FallbackLayer
             UINT totalTriangleCount,
             D3D12_GPU_VIRTUAL_ADDRESS outputTriangleBuffer,
             D3D12_GPU_VIRTUAL_ADDRESS outputMetadataBuffer,
-            const bool performUpdate);
+            D3D12_GPU_VIRTUAL_ADDRESS cachedSortBuffer);
     private:
         enum RootParameterSlot
         {
@@ -30,6 +30,7 @@ namespace FallbackLayer
             ElementBufferSRV,
             InputRootConstants,
             TransformsBuffer,
+            CachedSortBuffer,
             NumRootParameters,
         };
 

@@ -63,10 +63,6 @@ namespace FallbackLayer
         }
 #endif
 
-        if (pDesc->Flags & D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE) {
-            m_updateAllowed = true;
-        }
-
         switch (pDesc->Type)
         {
         case D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL:
@@ -128,6 +124,7 @@ namespace FallbackLayer
             sceneType,
             mortonCodeBuffer,
             hierarchyBuffer,
+            0,
             pCbvSrvUavDescriptorHeap->GetGPUDescriptorHandleForHeapStart(),
             numElements);
 
@@ -137,8 +134,8 @@ namespace FallbackLayer
             pDesc->DestAccelerationStructureData.StartAddress,
             calculateAABBScratchBuffer,
             nodeCountBuffer,
-            mortonCodeBuffer,
             hierarchyBuffer,
+            0,
             pCbvSrvUavDescriptorHeap->GetGPUDescriptorHandleForHeapStart(),
             numElements);
     }
@@ -169,81 +166,90 @@ namespace FallbackLayer
         D3D12_GPU_VIRTUAL_ADDRESS calculateAABBScratchBuffer = scratchGpuVA + scratchMemoryPartition.OffsetToCalculateAABBDispatchArgs;
         D3D12_GPU_VIRTUAL_ADDRESS nodeCountBuffer = scratchGpuVA + scratchMemoryPartition.OffsetToPerNodeCounter;
 
+        D3D12_GPU_VIRTUAL_ADDRESS outputLeafNodeAABBBuffer = pDesc->DestAccelerationStructureData.StartAddress + SizeOfBVHOffsets;
         D3D12_GPU_VIRTUAL_ADDRESS outputTriangleBuffer = pDesc->DestAccelerationStructureData.StartAddress + GetOffsetToPrimitives(totalTriangles);
         D3D12_GPU_VIRTUAL_ADDRESS outputMetadataBuffer = outputTriangleBuffer + GetOffsetFromPrimitivesToPrimitiveMetaData(totalTriangles);
+        D3D12_GPU_VIRTUAL_ADDRESS outputIndexBuffer = outputMetadataBuffer + GetOffsetFromPrimitiveMetaDataToSortedIndices(totalTriangles);
+        D3D12_GPU_VIRTUAL_ADDRESS outputAABBParentBuffer = outputIndexBuffer + GetOffsetFromSortedIndicesToAABBParents(totalTriangles);
 
         const SceneType sceneType = SceneType::Triangles;
 
-        const bool shouldPerformUpdate = m_updateAllowed && pDesc->Flags & D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
-        m_loadPrimitivesPass.LoadPrimitives(
+        const bool performUpdate = m_updateAllowed && (pDesc->Flags & D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE);
+        
+        m_loadPrimitivesPass.LoadPrimitives( // Use outputIndexBuffer when performUpdate
             pCommandList, 
             *pDesc, 
             totalTriangles, 
-            shouldPerformUpdate ? outputTriangleBuffer : scratchTriangleBuffer, 
-            shouldPerformUpdate ? outputMetadataBuffer : scratchMetadataBuffer, 
-            shouldPerformUpdate);
+            performUpdate ? outputTriangleBuffer : scratchTriangleBuffer, 
+            performUpdate ? outputMetadataBuffer : scratchMetadataBuffer, 
+            performUpdate ? outputIndexBuffer    : 0);
         
-        m_sceneAABBCalculator.CalculateSceneAABB(
-            pCommandList, 
-            sceneType, 
-            scratchTriangleBuffer, 
-            totalTriangles, 
-            sceneAABBScratchMemory, 
-            sceneAABB);
+        if(!performUpdate) // Rebuilding the BVH
+        {
+            m_sceneAABBCalculator.CalculateSceneAABB(
+                pCommandList, 
+                sceneType, 
+                scratchTriangleBuffer, 
+                totalTriangles, 
+                sceneAABBScratchMemory, 
+                sceneAABB);
 
-        m_mortonCodeCalculator.CalculateMortonCodes(
-            pCommandList, 
-            sceneType, 
-            scratchTriangleBuffer, 
-            totalTriangles, 
-            sceneAABB, 
-            indexBuffer, 
-            mortonCodeBuffer);
+            m_mortonCodeCalculator.CalculateMortonCodes(
+                pCommandList, 
+                sceneType, 
+                scratchTriangleBuffer, 
+                totalTriangles, 
+                sceneAABB, 
+                m_updateAllowed ? outputIndexBuffer : indexBuffer, 
+                mortonCodeBuffer);
 
-        m_sorterPass.Sort(
-            pCommandList, 
-            mortonCodeBuffer, 
-            indexBuffer, 
-            totalTriangles, 
-            false, 
-            true);
+            m_sorterPass.Sort(
+                pCommandList, 
+                mortonCodeBuffer, 
+                m_updateAllowed ? outputIndexBuffer : indexBuffer, 
+                totalTriangles, 
+                false, 
+                true);
 
-        m_rearrangePass.Rearrange(
-            pCommandList,
-            sceneType,
-            scratchTriangleBuffer,
-            totalTriangles,
-            indexBuffer,
-            outputTriangleBuffer,
-            scratchMetadataBuffer,
-            outputMetadataBuffer);
+            m_rearrangePass.Rearrange(
+                pCommandList,
+                sceneType,
+                scratchTriangleBuffer,
+                totalTriangles,
+                m_updateAllowed ? outputIndexBuffer : indexBuffer,
+                outputTriangleBuffer,
+                scratchMetadataBuffer,
+                outputMetadataBuffer);
 
-        m_constructHierarchyPass.ConstructHierarchy(
-            pCommandList,
-            sceneType,
-            mortonCodeBuffer,
-            hierarchyBuffer,
-            D3D12_GPU_DESCRIPTOR_HANDLE(),
-            totalTriangles);
+            m_constructHierarchyPass.ConstructHierarchy(
+                pCommandList,
+                sceneType,
+                mortonCodeBuffer,
+                hierarchyBuffer,
+                m_updateAllowed ? outputAABBParentBuffer : 0, // Store parent indices in hierarchy pass
+                D3D12_GPU_DESCRIPTOR_HANDLE(),
+                totalTriangles);
 
-        m_treeletReorder.Optimize(
-            pCommandList,
-            totalTriangles,
-            hierarchyBuffer,
-            nodeCountBuffer,
-            sceneAABBScratchMemory,
-            outputTriangleBuffer,
-            D3D12_GPU_DESCRIPTOR_HANDLE(),
-            pDesc->Flags);
+            m_treeletReorder.Optimize(
+                pCommandList,
+                totalTriangles,
+                hierarchyBuffer,
+                m_updateAllowed ? outputAABBParentBuffer : 0, // Make sure parent indices get updated when things are reshuffled
+                nodeCountBuffer,
+                sceneAABBScratchMemory,
+                outputTriangleBuffer,
+                D3D12_GPU_DESCRIPTOR_HANDLE(),
+                pDesc->Flags);
+        }
 
-        m_constructAABBPass.ConstructAABB(
+        m_constructAABBPass.ConstructAABB( // Read parent indices from buffer
             pCommandList,
             sceneType,
             pDesc->DestAccelerationStructureData.StartAddress,
             calculateAABBScratchBuffer,
             nodeCountBuffer,
-            mortonCodeBuffer,
             hierarchyBuffer,
+            performUpdate ? outputAABBParentBuffer : 0,
             D3D12_GPU_DESCRIPTOR_HANDLE(),
             totalTriangles);
     }
@@ -343,6 +349,13 @@ namespace FallbackLayer
 
             pInfo->ResultDataMaxSizeInBytes = sizeof(BVHOffsets) + totalNumberOfTriangles * (sizeof(Primitive) + sizeof(PrimitiveMetaData)) +
                 totalNumNodes * sizeof(AABBNode);
+
+            if (pDesc->Flags & D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE) 
+            {
+                m_updateAllowed = true;
+                pInfo->ResultDataMaxSizeInBytes += totalNumNodes * sizeof(UINT); // Parent indices for AABBNodes
+                pInfo->ResultDataMaxSizeInBytes += totalNumberOfTriangles * sizeof(UINT); // Saved sorted index buffer
+            }
 
             pInfo->ScratchDataSizeInBytes = CalculateScratchMemoryUsage(Level::Bottom, totalNumberOfTriangles).TotalSize;
             pInfo->UpdateScratchDataSizeInBytes = 0;

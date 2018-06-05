@@ -17,14 +17,15 @@
 struct InputConstants
 {
     uint NumberOfElements;
+    uint PerformUpdate;
 };
 
 // UAVs
 #define OutputBVHRegister 0
 #define ScratchBufferRegister 1
 #define ChildNodesProcessedBufferRegister 2
-#define MortonCodesBufferRegister 3
-#define HierarchyBufferRegister 4
+#define HierarchyBufferRegister 3
+#define AABBParentBufferRegister 4
 
 #define GlobalDescriptorHeapRegister 0
 #define GlobalDescriptorHeapRegisterSpace 1
@@ -36,8 +37,8 @@ struct InputConstants
 globallycoherent RWByteAddressBuffer outputBVH : UAV_REGISTER(OutputBVHRegister);
 RWByteAddressBuffer scratchMemory : UAV_REGISTER(ScratchBufferRegister);
 RWByteAddressBuffer childNodesProcessedCounter : UAV_REGISTER(ChildNodesProcessedBufferRegister);
-RWStructuredBuffer<uint> mortonCodes : UAV_REGISTER(MortonCodesBufferRegister);
 RWStructuredBuffer<HierarchyNode> hierarchyBuffer : UAV_REGISTER(HierarchyBufferRegister);
+RWStructuredBuffer<uint> aabbParentBuffer : UAV_REGISTER(AABBParentBufferRegister);
 RWByteAddressBuffer DescriptorHeapBufferTable[] : UAV_REGISTER_SPACE(GlobalDescriptorHeapRegister, GlobalDescriptorHeapRegisterSpace);
 
 cbuffer ConstructHierarchyConstants : CONSTANT_REGISTER(InputConstantsRegister)

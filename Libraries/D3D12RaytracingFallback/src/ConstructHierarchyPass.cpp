@@ -20,6 +20,7 @@ namespace FallbackLayer
         D3D12_DESCRIPTOR_RANGE1 globalDescriptorHeapRange = CD3DX12_DESCRIPTOR_RANGE1(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, (UINT)-1, GlobalDescriptorHeapRegister, GlobalDescriptorHeapRegisterSpace, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE | D3D12_DESCRIPTOR_RANGE_FLAG_DESCRIPTORS_VOLATILE, 0);
         CD3DX12_ROOT_PARAMETER1 rootParameters[NumRootParameters];
         rootParameters[HierarchyUAVParam].InitAsUnorderedAccessView(HierarchyBufferRegister);
+        rootParameters[AABBParentBufferParam].InitAsUnorderedAccessView(AABBParentBufferRegister);
         rootParameters[MortonCodesBufferParam].InitAsUnorderedAccessView(MortonCodesBufferRegister);
         rootParameters[InputRootConstants].InitAsConstants(SizeOfInUint32(InputConstants), InputConstantsRegister);
         rootParameters[GlobalDescriptorHeap].InitAsDescriptorTable(1, &globalDescriptorHeapRange);
@@ -36,19 +37,28 @@ namespace FallbackLayer
         SceneType sceneType,
         D3D12_GPU_VIRTUAL_ADDRESS mortonCodeBuffer,
         D3D12_GPU_VIRTUAL_ADDRESS hierarchyBuffer,
+        D3D12_GPU_VIRTUAL_ADDRESS outputAABBParentBuffer,
         D3D12_GPU_DESCRIPTOR_HANDLE globalDescriptorHeap,
         UINT numElements)
     {
         if (numElements == 0) return;
 
+        const bool updatesAllowed = outputAABBParentBuffer != 0;
+
         Level level = (sceneType == SceneType::Triangles) ? Level::Bottom : Level::Top;
 
-        InputConstants constants = { numElements };
+        InputConstants constants = { numElements, (UINT) updatesAllowed };
 
         pCommandList->SetComputeRootSignature(m_pRootSignature);
         pCommandList->SetComputeRoot32BitConstants(InputRootConstants, SizeOfInUint32(InputConstants), &constants, 0);
         pCommandList->SetComputeRootUnorderedAccessView(MortonCodesBufferParam, mortonCodeBuffer);
         pCommandList->SetComputeRootUnorderedAccessView(HierarchyUAVParam, hierarchyBuffer);
+
+        if (updatesAllowed)
+        {
+            pCommandList->SetComputeRootUnorderedAccessView(AABBParentBufferParam, outputAABBParentBuffer);
+        }
+
         if (level == Top)
         {
             pCommandList->SetComputeRootDescriptorTable(GlobalDescriptorHeap, globalDescriptorHeap);

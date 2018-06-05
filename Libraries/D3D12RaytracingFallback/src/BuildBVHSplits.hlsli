@@ -23,6 +23,10 @@ int CountLeadingZeroes(uint num)
 void WriteChild(uint childIndex, uint parentIndex)
 {
     hierarchyBuffer[childIndex].ParentIndex = parentIndex;
+    if (Constants.UpdatesAllowed)
+    {
+        aabbParentBuffer[childIndex] = parentIndex;
+    }
 }
 
 void WriteParent(uint parentIndex, int leftBoxIndex, int rightBoxIndex)

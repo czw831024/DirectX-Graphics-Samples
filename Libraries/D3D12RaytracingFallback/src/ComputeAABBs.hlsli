@@ -104,7 +104,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
             break;
         }
 
-        uint parentNodeIndex = hierarchyBuffer[nodeIndex].ParentIndex;
+        uint parentNodeIndex = Constants.PerformUpdate ? aabbParentBuffer[nodeIndex] : hierarchyBuffer[nodeIndex].ParentIndex;
         uint trianglesFromOtherChild;
         // If this counter was already incremented, that means both children for the parent 
         // node have computed their AABB, and the parent is ready to be processed

@@ -36,6 +36,7 @@ struct LoadPrimitivesInputConstants
 // UAVs
 #define OutputPrimitiveBufferRegister 0
 #define OutputMetadataBufferRegister 1
+#define CachedSortBufferRegister 2
 
 //SRVs 
 #define ElementBufferRegister 0
@@ -49,6 +50,7 @@ struct LoadPrimitivesInputConstants
 
 RWStructuredBuffer<Primitive> PrimitiveBuffer : UAV_REGISTER(OutputPrimitiveBufferRegister);
 RWStructuredBuffer<PrimitiveMetaData> MetadataBuffer : UAV_REGISTER(OutputMetadataBufferRegister);
+RWStructuredBuffer<uint> CachedSortBuffer : UAV_REGISTER(CachedSortBufferRegister);
 
 ByteAddressBuffer elementBuffer : SRV_REGISTER(ElementBufferRegister);
 ByteAddressBuffer indexBuffer : SRV_REGISTER(IndexBufferRegister);
@@ -60,23 +62,15 @@ cbuffer LoadPrimitivesConstants : CONSTANT_REGISTER(LoadInstancesConstantsRegist
 
 uint GetSortedIndex(uint globalPrimitiveIndex) 
 {
-    for(uint i = Constants.PrimitiveOffset; i < Constants.PrimitiveOffset + Constants.NumPrimitivesBound; i++) 
-    {
-        if (MetadataBuffer[i].PresortIndex == globalPrimitiveIndex) 
-        {
-            return i;
-        }
-    }
-    return 0;
+    return CachedSortBuffer[globalPrimitiveIndex];
 }
 
-void StorePrimitiveMetadata(uint globalPrimitiveIndex, uint localPrimitiveIndex, uint presortIndex)
+void StorePrimitiveMetadata(uint globalPrimitiveIndex, uint localPrimitiveIndex)
 {
     PrimitiveMetaData metaData;
     metaData.GeometryContributionToHitGroupIndex = Constants.GeometryContributionToHitGroupIndex;
     metaData.PrimitiveIndex = localPrimitiveIndex;
     metaData.GeometryFlags = Constants.GeometryFlags;
-    metaData.PresortIndex = Constants.PerformUpdate * presortIndex;
     MetadataBuffer[globalPrimitiveIndex] = metaData;
 }
 #endif

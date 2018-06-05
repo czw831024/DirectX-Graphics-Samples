@@ -180,9 +180,8 @@ struct PrimitiveMetaData
     uint GeometryContributionToHitGroupIndex;
     uint PrimitiveIndex;
     uint GeometryFlags;
-    uint PresortIndex;
 };
-#define SizeOfPrimitiveMetaData (4 * 4)
+#define SizeOfPrimitiveMetaData (4 * 3)
 #ifndef HLSL
 static_assert(sizeof(PrimitiveMetaData) == SizeOfPrimitiveMetaData, L"Incorrect sizeof for PrimitiveMetaData");
 #endif
@@ -401,6 +400,17 @@ inline
 uint GetNumInternalNodes(uint numLeaves)
 {
     return numLeaves - 1;
+}
+
+inline
+uint GetOffsetFromSortedIndicesToAABBParents(uint numPrimitives) {
+    return 4 /* sizeof(UINT) */ * numPrimitives;
+}
+
+inline
+uint GetOffsetFromPrimitiveMetaDataToSortedIndices(uint numPrimitives)
+{
+    return SizeOfPrimitiveMetaData * numPrimitives;
 }
 
 inline

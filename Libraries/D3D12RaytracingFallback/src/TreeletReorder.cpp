@@ -21,6 +21,7 @@ namespace FallbackLayer
 
         CD3DX12_ROOT_PARAMETER1 parameters[RootParameterSlot::NumParameters];
         parameters[HierarchyBufferSlot].InitAsUnorderedAccessView(HierarchyBufferRegister);
+        parameters[AABBParentBufferSlot].InitAsUnorderedAccessView(AABBParentBufferRegister);
         parameters[TriangleCountBufferSlot].InitAsUnorderedAccessView(NumTrianglesBufferRegister);
         parameters[AABBBufferSlot].InitAsUnorderedAccessView(AABBBufferRegister);
         parameters[InputElementSlot].InitAsUnorderedAccessView(ElementBufferRegister);
@@ -38,6 +39,7 @@ namespace FallbackLayer
         ID3D12GraphicsCommandList *pCommandList,
         UINT numElements,
         D3D12_GPU_VIRTUAL_ADDRESS hierarchyBuffer,
+        D3D12_GPU_VIRTUAL_ADDRESS outputAABBParentBuffer,
         D3D12_GPU_VIRTUAL_ADDRESS triangleCountBuffer,
         D3D12_GPU_VIRTUAL_ADDRESS aabbBuffer,
         D3D12_GPU_VIRTUAL_ADDRESS inputElementBuffer,
@@ -46,15 +48,24 @@ namespace FallbackLayer
     {
         if (numElements == 0) return;
 
+        const bool updatesAllowed = outputAABBParentBuffer != 0;
+
         InputConstants constants;
         constants.NumberOfElements = numElements;
         constants.MinTrianglesPerTreelet = 7;
+        constants.UpdatesAllowed = updatesAllowed;
 
         pCommandList->SetComputeRootSignature(m_pRootSignature);
         pCommandList->SetComputeRootUnorderedAccessView(HierarchyBufferSlot, hierarchyBuffer);
         pCommandList->SetComputeRootUnorderedAccessView(TriangleCountBufferSlot, triangleCountBuffer);
         pCommandList->SetComputeRootUnorderedAccessView(AABBBufferSlot, aabbBuffer);
         pCommandList->SetComputeRootUnorderedAccessView(InputElementSlot, inputElementBuffer);
+
+        if (updatesAllowed) 
+        {
+            pCommandList->SetComputeRootUnorderedAccessView(AABBParentBufferSlot, outputAABBParentBuffer);
+        }
+
         if (globalDescriptorHeap.ptr)
         {
             pCommandList->SetComputeRootDescriptorTable(GlobalDescriptorHeap, globalDescriptorHeap);

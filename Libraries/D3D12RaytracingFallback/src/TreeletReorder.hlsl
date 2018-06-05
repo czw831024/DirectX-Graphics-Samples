@@ -229,8 +229,13 @@ void main( uint3 DTid : SV_DispatchThreadID )
 
                 hierarchyBuffer[partition.NodeIndex].LeftChildIndex = leftEntry.NodeIndex;
                 hierarchyBuffer[partition.NodeIndex].RightChildIndex = rightEntry.NodeIndex;
-                hierarchyBuffer[leftEntry.NodeIndex].ParentIndex = partition.NodeIndex;
+                hierarchyBuffer[leftEntry.NodeIndex].ParentIndex = partition.NodeIndex;                
                 hierarchyBuffer[rightEntry.NodeIndex].ParentIndex = partition.NodeIndex;
+                if (Constants.UpdatesAllowed) 
+                {
+                    aabbParentBuffer[leftEntry.NodeIndex] = partition.NodeIndex;
+                    aabbParentBuffer[rightEntry.NodeIndex] = partition.NodeIndex;
+                }                
             }
 
             // Start from the back. This is optimizing since the previous traversal went from

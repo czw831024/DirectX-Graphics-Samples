@@ -25,6 +25,7 @@ namespace FallbackLayer
         rootParameters[TransformsBuffer].InitAsShaderResourceView(TransformRegister);
         rootParameters[OutputBuffer].InitAsUnorderedAccessView(OutputPrimitiveBufferRegister);
         rootParameters[OutputMetadataBuffer].InitAsUnorderedAccessView(OutputMetadataBufferRegister);
+        rootParameters[CachedSortBuffer].InitAsUnorderedAccessView(CachedSortBufferRegister);
         rootParameters[InputRootConstants].InitAsConstants(SizeOfInUint32(LoadPrimitivesInputConstants), LoadInstancesConstantsRegister);
 
         auto rootSignatureDesc = CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC(ARRAYSIZE(rootParameters), rootParameters);
@@ -57,8 +58,10 @@ namespace FallbackLayer
         const UINT totalPrimitiveCount,
         D3D12_GPU_VIRTUAL_ADDRESS outputTriangleBuffer,
         D3D12_GPU_VIRTUAL_ADDRESS outputMetadataBuffer,
-        const bool performUpdate)
+        D3D12_GPU_VIRTUAL_ADDRESS cachedSortBuffer)
     {
+        const bool performUpdate = cachedSortBuffer != 0;
+
         CComPtr<ID3D12Device> pDevice;
         pCommandList->GetDevice(IID_PPV_ARGS(&pDevice));
         pCommandList->SetComputeRootSignature(m_pRootSignature);
@@ -148,6 +151,12 @@ namespace FallbackLayer
                 pCommandList->SetComputeRootShaderResourceView(ElementBufferSRV, aabbs.AABBs.StartAddress);
                 pCommandList->SetPipelineState(m_pLoadProceduralGeometryPSO);
             }
+
+            if(performUpdate) 
+            {
+                pCommandList->SetComputeRootUnorderedAccessView(CachedSortBuffer, cachedSortBuffer);
+            }
+            
             pCommandList->SetComputeRootUnorderedAccessView(OutputBuffer, outputTriangleBuffer);
             pCommandList->SetComputeRootUnorderedAccessView(OutputMetadataBuffer, outputMetadataBuffer);
 

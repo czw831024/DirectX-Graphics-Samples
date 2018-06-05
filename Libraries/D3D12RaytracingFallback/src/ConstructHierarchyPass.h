@@ -20,12 +20,14 @@ namespace FallbackLayer
             SceneType sceneType,
             D3D12_GPU_VIRTUAL_ADDRESS mortonCodeBuffer,
             D3D12_GPU_VIRTUAL_ADDRESS hierarchyBuffer,
+            D3D12_GPU_VIRTUAL_ADDRESS outputAABBParentBuffer,
             D3D12_GPU_DESCRIPTOR_HANDLE globalDescriptorHeap,
             UINT numElements);
     private:
         enum RootParameterSlot
         {
             HierarchyUAVParam = 0,
+            AABBParentBufferParam,
             MortonCodesBufferParam,
             InputRootConstants,
             GlobalDescriptorHeap,

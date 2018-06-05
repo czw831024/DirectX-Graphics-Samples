@@ -451,7 +451,7 @@ namespace FallbackLayerUnitTests
             builder.GetRaytracingAccelerationStructurePrebuildInfo(
                 &device,
                 D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL,
-                D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_BUILD,
+                D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_BUILD | D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE,
                 geomCount,
                 descs.data(),
                 &prebuildInfo);
@@ -2382,7 +2382,6 @@ namespace FallbackLayerUnitTests
                         metadata.GeometryContributionToHitGroupIndex = 0;
                         metadata.PrimitiveIndex = i;
                         metadata.GeometryFlags = 0;
-                        metadata.PresortIndex = 0;
                         trianglesMetadata.push_back(metadata);
                     }
                 }
@@ -2726,6 +2725,7 @@ namespace FallbackLayerUnitTests
                 pCommandList,
                 numLeafNodes,
                 pHierarchyBuffer->GetGPUVirtualAddress(),
+                0,
                 pNodeCountBuffer->GetGPUVirtualAddress(),
                 pAABBBuffer->GetGPUVirtualAddress(),
                 pTriangleBuffer->GetGPUVirtualAddress(),
@@ -2942,8 +2942,6 @@ namespace FallbackLayerUnitTests
                         IsFloatArrayEqual((float*)&inputTri, (float *)&pOutputTriangles[outputIndex], 9),
                         L"Triangles in output buffers not correctly in reverse order");
 
-                    Assert::IsTrue(inputIndex == pOutputPrimitiveMetaData[outputIndex].PresortIndex, L"Metadata pre-sort index not correctly assigned");
-                    pInputPrimitiveMetaData[inputIndex].PresortIndex = pOutputPrimitiveMetaData[outputIndex].PresortIndex;
                     Assert::IsTrue(
                         memcmp(&pInputPrimitiveMetaData[inputIndex], &pOutputPrimitiveMetaData[outputIndex], sizeof(*pInputPrimitiveMetaData)) == 0,
                         L"Metadata in output buffers not correctly in reverse order");
