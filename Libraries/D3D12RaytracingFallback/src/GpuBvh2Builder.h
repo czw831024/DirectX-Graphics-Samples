@@ -81,6 +81,30 @@ namespace FallbackLayer
         PostBuildInfoQuery m_postBuildInfoQuery;
         GpuBvh2Copy m_copyPass;
 
+        // A street is made up of addresses ;)
+        struct BVHGPUStreet {
+            D3D12_GPU_VIRTUAL_ADDRESS scratchElementBuffer;
+            D3D12_GPU_VIRTUAL_ADDRESS outputElementBuffer;
+            D3D12_GPU_VIRTUAL_ADDRESS scratchMetadataBuffer;
+            D3D12_GPU_VIRTUAL_ADDRESS outputMetadataBuffer;
+            D3D12_GPU_VIRTUAL_ADDRESS sceneAABBScratchMemory;
+            D3D12_GPU_VIRTUAL_ADDRESS sceneAABB;
+            D3D12_GPU_VIRTUAL_ADDRESS mortonCodeBuffer;
+            D3D12_GPU_VIRTUAL_ADDRESS indexBuffer;
+            D3D12_GPU_VIRTUAL_ADDRESS outputSortCacheBuffer;
+            D3D12_GPU_VIRTUAL_ADDRESS hierarchyBuffer;
+            D3D12_GPU_VIRTUAL_ADDRESS nodeCountBuffer;
+            D3D12_GPU_VIRTUAL_ADDRESS calculateAABBScratchBuffer;
+            D3D12_GPU_VIRTUAL_ADDRESS outputAABBParentBuffer;
+        };
+
+        void GpuBvh2Builder::LoadBVHGPUStreet(
+            _In_  const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC *pDesc,
+            Level bvhLevel,
+            UINT numElements,
+            BVHGPUStreet &street
+        );
+        
         void BuildTopLevelBVH(
             _In_  ID3D12GraphicsCommandList *pCommandList,
             _In_  const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC *pDesc,
@@ -90,6 +114,15 @@ namespace FallbackLayer
         void BuildBottomLevelBVH(
             _In_  ID3D12GraphicsCommandList *pCommandList,
             _In_  const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC *pDesc
+        );
+
+        void GpuBvh2Builder::BuildBVH(
+            _In_  ID3D12GraphicsCommandList *pCommandList,
+            _In_  const D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC *pDesc,
+            Level bvhLevel,
+            SceneType sceneType,
+            UINT numElements,
+            D3D12_GPU_DESCRIPTOR_HANDLE globalDescriptorHeap
         );
 
         void GpuBvh2Builder::LoadBVHElements(
@@ -118,7 +151,7 @@ namespace FallbackLayer
             D3D12_GPU_VIRTUAL_ADDRESS sceneAABB,
             D3D12_GPU_VIRTUAL_ADDRESS mortonCodeBuffer,
             D3D12_GPU_VIRTUAL_ADDRESS indexBuffer,
-            D3D12_GPU_VIRTUAL_ADDRESS outputIndexBuffer,
+            D3D12_GPU_VIRTUAL_ADDRESS outputSortCacheBuffer,
             D3D12_GPU_VIRTUAL_ADDRESS hierarchyBuffer,
             D3D12_GPU_VIRTUAL_ADDRESS outputAABBParentBuffer,
             D3D12_GPU_VIRTUAL_ADDRESS nodeCountBuffer,

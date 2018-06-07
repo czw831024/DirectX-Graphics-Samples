@@ -69,6 +69,12 @@ void main(uint3 DTid : SV_DispatchThreadID)
 
     RaytracingInstanceDesc instanceDesc = GetInstanceDesc(instanceIndex);
 
+    if (Constants.PerformUpdate) 
+    {
+        instanceIndex = CachedSortBuffer[instanceIndex];
+    }
+
+
     RWByteAddressBufferPointer bottomLevelByteAddressPointer = CreateRWByteAddressBufferPointerFromGpuVA(instanceDesc.AccelerationStructure);
 
     int2 unusedFlag;

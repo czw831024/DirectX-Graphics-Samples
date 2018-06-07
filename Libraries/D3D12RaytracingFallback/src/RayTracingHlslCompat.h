@@ -408,6 +408,12 @@ uint GetOffsetFromSortedIndicesToAABBParents(uint numPrimitives) {
 }
 
 inline
+uint GetOffsetToBVHSortedIndices(uint numElements) {
+    uint totalNodes = numElements + GetNumInternalNodes(numElements);
+    return SizeOfBVHOffsets + SizeOfAABBNode * totalNodes + SizeOfBVHMetadata * numElements;
+}
+
+inline
 uint GetOffsetFromPrimitiveMetaDataToSortedIndices(uint numPrimitives)
 {
     return SizeOfPrimitiveMetaData * numPrimitives;
