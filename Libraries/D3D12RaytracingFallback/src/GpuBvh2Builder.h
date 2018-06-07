@@ -118,6 +118,7 @@ namespace FallbackLayer
             D3D12_GPU_VIRTUAL_ADDRESS sceneAABB,
             D3D12_GPU_VIRTUAL_ADDRESS mortonCodeBuffer,
             D3D12_GPU_VIRTUAL_ADDRESS indexBuffer,
+            D3D12_GPU_VIRTUAL_ADDRESS outputIndexBuffer,
             D3D12_GPU_VIRTUAL_ADDRESS hierarchyBuffer,
             D3D12_GPU_VIRTUAL_ADDRESS outputAABBParentBuffer,
             D3D12_GPU_VIRTUAL_ADDRESS nodeCountBuffer,

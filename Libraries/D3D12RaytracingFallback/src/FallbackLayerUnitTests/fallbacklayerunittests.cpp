@@ -100,6 +100,26 @@ namespace FallbackLayerUnitTests
         D3D12_CPU_DESCRIPTOR_HANDLE m_descriptorHeapCpuBase;
     };
 
+    D3D12_RAYTRACING_GEOMETRY_DESC GetGeometryDesc(
+        const CpuGeometryDescriptor &geomDesc,
+        ID3D12Resource *pVertexBuffer = nullptr,
+        ID3D12Resource *pIndexBuffer = nullptr,
+        D3D12_GPU_VIRTUAL_ADDRESS transform = 0)
+    {
+        D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc = {};
+        geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+        geometryDesc.Triangles.IndexBuffer = pIndexBuffer ? pIndexBuffer->GetGPUVirtualAddress() : 0;
+        geometryDesc.Triangles.IndexCount = geomDesc.m_numIndicies;
+        geometryDesc.Triangles.IndexFormat = geomDesc.m_indexBufferFormat;
+        geometryDesc.Triangles.Transform = transform;
+        geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+        geometryDesc.Triangles.VertexCount = geomDesc.m_numVerticies;
+        geometryDesc.Triangles.VertexBuffer.StartAddress = pVertexBuffer ? pVertexBuffer->GetGPUVirtualAddress() : 0;
+        geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(float) * 3;
+
+        return geometryDesc;
+    }
+
 #define ALIGN(alignment, num) (((num + alignment - 1) / alignment) * alignment)
 
     class BuilderWrapper
@@ -340,7 +360,8 @@ namespace FallbackLayerUnitTests
             CpuGeometryDescriptor *pCpuGeometryDescriptors, UINT numGeometry,
             ID3D12Resource **ppBottomLevelAccelerationStructure,
             D3D12_ELEMENTS_LAYOUT layoutToTest = D3D12_ELEMENTS_LAYOUT_ARRAY,
-            UINT offsetPointer = 0
+            UINT offsetPointer = 0,
+            D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_BUILD
         )
         {
             ID3D12Device &device = m_d3d12Context.GetDevice();
@@ -362,7 +383,7 @@ namespace FallbackLayerUnitTests
                 geometryDescs[i] = GetGeometryDesc(desc, pVertexBuffer[i], pIndexBuffer[i], transformBuffers[i]->GetGPUVirtualAddress());
             }
 
-            D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO prebuildInfo = GetSizeNeededForBottomLevelHeap(device, builder, pCpuGeometryDescriptors, numGeometry);
+            D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO prebuildInfo = GetSizeNeededForBottomLevelHeap(device, builder, pCpuGeometryDescriptors, numGeometry, buildFlags);
 
             auto bottomLevelResourceDesc = CD3DX12_RESOURCE_DESC::Buffer(offsetPointer + prebuildInfo.ResultDataMaxSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
             auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
@@ -396,7 +417,7 @@ namespace FallbackLayerUnitTests
             bottomLevelDesc.DestAccelerationStructureData.SizeInBytes = (*ppBottomLevelAccelerationStructure)->GetDesc().Width;
             bottomLevelDesc.ScratchAccelerationStructureData.StartAddress = prebuildInfo.ScratchDataSizeInBytes > 0 ? pScratchMemory->GetGPUVirtualAddress() : 0;
             bottomLevelDesc.ScratchAccelerationStructureData.SizeInBytes = pScratchMemory->GetDesc().Width;
-            bottomLevelDesc.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_BUILD;
+            bottomLevelDesc.Flags = buildFlags;
             bottomLevelDesc.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
             bottomLevelDesc.NumDescs = (UINT)geometryDescs.size();
             if (layoutToTest == D3D12_ELEMENTS_LAYOUT_ARRAY)
@@ -429,16 +450,18 @@ namespace FallbackLayerUnitTests
             BuilderWrapper &builder,
             CpuGeometryDescriptor &geometryDescriptor,
             ID3D12Resource **ppBottomLevelAccelerationStructure,
-            UINT offsetToPointer = 0)
+            UINT offsetToPointer = 0,
+            D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_BUILD)
         {
-            BuildBottomLevelAccelerationStructure(builder, &geometryDescriptor, 1, ppBottomLevelAccelerationStructure, D3D12_ELEMENTS_LAYOUT_ARRAY, offsetToPointer);
+            BuildBottomLevelAccelerationStructure(builder, &geometryDescriptor, 1, ppBottomLevelAccelerationStructure, D3D12_ELEMENTS_LAYOUT_ARRAY, offsetToPointer, buildFlags);
         }
 
         D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO GetSizeNeededForBottomLevelHeap(
             ID3D12Device &device,
             BuilderWrapper &builder,
             const CpuGeometryDescriptor *pGeomDescs,
-            UINT geomCount)
+            UINT geomCount,
+            D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_BUILD)
         {
             std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> descs(geomCount);
             D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO prebuildInfo;
@@ -451,34 +474,13 @@ namespace FallbackLayerUnitTests
             builder.GetRaytracingAccelerationStructurePrebuildInfo(
                 &device,
                 D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL,
-                D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_BUILD | D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE,
+                buildFlags,
                 geomCount,
                 descs.data(),
                 &prebuildInfo);
             return prebuildInfo;
         }
     private:
-
-        D3D12_RAYTRACING_GEOMETRY_DESC GetGeometryDesc(
-            const CpuGeometryDescriptor &geomDesc,
-            ID3D12Resource *pVertexBuffer = nullptr,
-            ID3D12Resource *pIndexBuffer = nullptr,
-            D3D12_GPU_VIRTUAL_ADDRESS transform = 0)
-        {
-            D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc = {};
-            geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-            geometryDesc.Triangles.IndexBuffer = pIndexBuffer ? pIndexBuffer->GetGPUVirtualAddress() : 0;
-            geometryDesc.Triangles.IndexCount = geomDesc.m_numIndicies;
-            geometryDesc.Triangles.IndexFormat = geomDesc.m_indexBufferFormat;
-            geometryDesc.Triangles.Transform = transform;
-            geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-            geometryDesc.Triangles.VertexCount = geomDesc.m_numVerticies;
-            geometryDesc.Triangles.VertexBuffer.StartAddress = pVertexBuffer ? pVertexBuffer->GetGPUVirtualAddress() : 0;
-            geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(float) * 3;
-
-            return geometryDesc;
-        }
-
         D3D12Context &m_d3d12Context;
         DescriptorHeapStack &m_descriptorHeapStack;
     };
@@ -1003,6 +1005,242 @@ namespace FallbackLayerUnitTests
             }
         }
 
+        TEST_METHOD(UpdatesAllowedAllocateMemoryGpuBVHBuilder) {
+            ID3D12Device &device = m_d3d12Context.GetDevice();
+            std::unique_ptr<FallbackLayer::IAccelerationStructureBuilder> pBuilder =
+                std::unique_ptr<FallbackLayer::IAccelerationStructureBuilder>(
+                    new FallbackLayer::GpuBvh2Builder(&device, m_d3d12Context.GetTotalLaneCount(), 0));
+            InternalFallbackBuilder builderWrapper(pBuilder.get());
+
+            UINT numVertices = VERTEX_COUNT(ReferenceVerticies0);
+            UINT numTriangles = numVertices / 3;
+            UINT totalNumNodes = numTriangles + numTriangles - 1; // A binary tree with N leaves will always have N - 1 internal nodes
+            UINT updateExtraDataSize = (numTriangles * sizeof(UINT)) + (totalNumNodes * sizeof(UINT));
+
+            CpuGeometryDescriptor cpuGeomDesc = CpuGeometryDescriptor(ReferenceVerticies0, numVertices);
+            D3D12_RAYTRACING_GEOMETRY_DESC gpuGeomDesc = GetGeometryDesc(cpuGeomDesc);
+
+            D3D12_GET_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO_DESC bottomLevelDesc = {};
+            bottomLevelDesc.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
+            bottomLevelDesc.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_BUILD;
+            bottomLevelDesc.NumDescs = 1;
+            bottomLevelDesc.pGeometryDescs = &gpuGeomDesc;
+            bottomLevelDesc.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+
+            D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO infoNoUpdate = {};
+            pBuilder->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelDesc, &infoNoUpdate);
+
+            // Turn on updates, make sure the memory gets allocated.
+            bottomLevelDesc.Flags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
+
+            D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO infoWithUpdate = {};
+            pBuilder->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelDesc, &infoWithUpdate);
+
+            Assert::AreEqual(infoNoUpdate.ScratchDataSizeInBytes, infoWithUpdate.ScratchDataSizeInBytes, L"Allowing update allocated scratch data.");
+            Assert::IsTrue(infoWithUpdate.ResultDataMaxSizeInBytes == infoNoUpdate.ResultDataMaxSizeInBytes + updateExtraDataSize, L"Data allocated for update doesn't match expected.");
+        }
+
+        TEST_METHOD(StoreSortResultForUpdate) {
+            ID3D12Device &device = m_d3d12Context.GetDevice();
+            std::unique_ptr<FallbackLayer::IAccelerationStructureBuilder> pBuilder =
+                std::unique_ptr<FallbackLayer::IAccelerationStructureBuilder>(
+                    new FallbackLayer::GpuBvh2Builder(&device, m_d3d12Context.GetTotalLaneCount(), 0));
+            InternalFallbackBuilder builderWrapper(pBuilder.get());
+
+            UINT numVertices = VERTEX_COUNT(ReferenceVerticies1);
+            UINT numTriangles = numVertices / 3;
+
+            CpuGeometryDescriptor geomDesc = CpuGeometryDescriptor(ReferenceVerticies1, VERTEX_COUNT(ReferenceVerticies1));
+
+            std::unique_ptr<BYTE[]> pData;
+            BuildBottomLevelAccelerationStructureAndGetCpuData(
+                builderWrapper,
+                &geomDesc,
+                1,
+                pData,
+                D3D12_ELEMENTS_LAYOUT_ARRAY,
+                D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_BUILD | D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE);
+            
+            const BYTE *pOutputBVH = pData.get();
+            BVHOffsets offsets = *(BVHOffsets*)pOutputBVH;
+            AABBNode *pNodeArray = (AABBNode*)((BYTE *)pOutputBVH + offsets.offsetToBoxes);
+            Primitive *pPrimitiveArray = (Primitive*)((BYTE *)pOutputBVH + offsets.offsetToVertices);
+            UINT *pSortResults = (UINT *)((BYTE *)pOutputBVH + offsets.totalSize);
+
+            for (UINT i = 0; i < numTriangles; i++) {
+                UINT sortedIndex = pSortResults[i];
+                Triangle sortedTriangle = pPrimitiveArray[sortedIndex].triangle;
+                for (UINT vi = 0; vi < 3; vi++) {
+                    Assert::AreEqual(sortedTriangle.v[vi].x, ReferenceVerticies1[i * 9 + vi * 3 + 0], L"x not equal");
+                    Assert::AreEqual(sortedTriangle.v[vi].y, ReferenceVerticies1[i * 9 + vi * 3 + 1], L"y not equal");
+                    Assert::AreEqual(sortedTriangle.v[vi].z, ReferenceVerticies1[i * 9 + vi * 3 + 2], L"z not equal");
+                }
+            }
+        }
+
+        TEST_METHOD(StoreParentIndicesForUpdate) {
+            ID3D12Device &device = m_d3d12Context.GetDevice();
+            std::unique_ptr<FallbackLayer::IAccelerationStructureBuilder> pBuilder =
+                std::unique_ptr<FallbackLayer::IAccelerationStructureBuilder>(
+                    new FallbackLayer::GpuBvh2Builder(&device, m_d3d12Context.GetTotalLaneCount(), 0));
+            InternalFallbackBuilder builderWrapper(pBuilder.get());
+
+            UINT numVertices = VERTEX_COUNT(ReferenceVerticies1);
+            UINT numTriangles = numVertices / 3;
+            UINT totalNumNodes = numTriangles + numTriangles - 1; // A binary tree with N leaves will always have N - 1 internal nodes
+
+            CpuGeometryDescriptor geomDesc = CpuGeometryDescriptor(ReferenceVerticies1, VERTEX_COUNT(ReferenceVerticies1));
+
+            std::unique_ptr<BYTE[]> pData;
+            BuildBottomLevelAccelerationStructureAndGetCpuData(
+                builderWrapper,
+                &geomDesc,
+                1,
+                pData,
+                D3D12_ELEMENTS_LAYOUT_ARRAY,
+                D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_BUILD | D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE);
+
+            const BYTE *pOutputBVH = pData.get();
+            BVHOffsets offsets = *(BVHOffsets*)pOutputBVH;
+            AABBNode *pNodeArray = (AABBNode*)((BYTE *)pOutputBVH + offsets.offsetToBoxes);
+            Primitive *pPrimitiveArray = (Primitive*)((BYTE *)pOutputBVH + offsets.offsetToVertices);
+            UINT *pUpdateInfoCache = (UINT *)((BYTE *)pOutputBVH + offsets.totalSize); // sort results + parent indices
+            UINT *pParentIndexCache = pUpdateInfoCache + numTriangles;
+
+            for (UINT parentIndex = 0; parentIndex < totalNumNodes; parentIndex++) {
+                AABBNode parent = pNodeArray[parentIndex];
+                if (!parent.leaf)
+                {
+                    UINT leftChildIndex = parent.internalNode.leftNodeIndex;
+                    UINT rightChildIndex = parent.rightNodeIndex;
+                    Assert::IsTrue(pParentIndexCache[leftChildIndex] == parentIndex, L"Left child parent index incorrectly assigned.");
+                    Assert::IsTrue(pParentIndexCache[rightChildIndex] == parentIndex, L"Right child parent index incorrectly assigned.");
+                }
+            }
+        }
+
+        TEST_METHOD(UpdatePrimitivesOnUpdate) {
+            ID3D12Device &device = m_d3d12Context.GetDevice();
+            std::unique_ptr<FallbackLayer::IAccelerationStructureBuilder> pBuilder =
+                std::unique_ptr<FallbackLayer::IAccelerationStructureBuilder>(
+                    new FallbackLayer::GpuBvh2Builder(&device, m_d3d12Context.GetTotalLaneCount(), 0));
+            InternalFallbackBuilder builderWrapper(pBuilder.get());
+
+            const D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_BUILD | D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
+
+            const UINT floatsPerVertex = 3;
+            const UINT verticesPerTriangle = 3;
+            const UINT floatsPerTriangle = verticesPerTriangle * floatsPerVertex;
+            UINT numVertices = VERTEX_COUNT(ReferenceVerticies1);
+            UINT numFloats = numVertices * floatsPerVertex;
+            UINT numTriangles = numVertices / 3;
+            UINT totalNumNodes = numTriangles + numTriangles - 1; // A binary tree with N leaves will always have N - 1 internal nodes
+
+            std::vector<float> UpdatedVertices(numFloats);
+            for (UINT i = 0; i < numFloats; i++) 
+            {
+                UpdatedVertices[i] = ReferenceVerticies1[i] + 1;
+            }
+
+            CComPtr<ID3D12Resource> pVertexBuffer;
+            m_d3d12Context.CreateResourceWithInitialData(
+                ReferenceVerticies1,
+                sizeof(float) * numFloats,
+                &pVertexBuffer);
+
+            CComPtr<ID3D12Resource> pUpdatedVertexBuffer;
+            m_d3d12Context.CreateResourceWithInitialData(
+                UpdatedVertices.data(),
+                sizeof(float) * numFloats,
+                &pUpdatedVertexBuffer);
+            
+            D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc = {};
+            geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+            geometryDesc.Triangles.IndexBuffer = 0;
+            geometryDesc.Triangles.IndexCount = 0;
+            geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_UNKNOWN;
+            geometryDesc.Triangles.Transform = 0;
+            geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+            geometryDesc.Triangles.VertexCount = numVertices;
+            geometryDesc.Triangles.VertexBuffer.StartAddress = pVertexBuffer->GetGPUVirtualAddress();
+            geometryDesc.Triangles.VertexBuffer.StrideInBytes = floatsPerVertex * sizeof(float);
+
+            auto heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+
+            D3D12_GET_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO_DESC getPrebuildDesc = {};
+            getPrebuildDesc.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+            getPrebuildDesc.NumDescs = 1;
+            getPrebuildDesc.pGeometryDescs = &geometryDesc;
+            getPrebuildDesc.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
+            getPrebuildDesc.Flags = buildFlags;
+
+            D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO prebuildInfo;
+            pBuilder->GetRaytracingAccelerationStructurePrebuildInfo(&getPrebuildDesc, &prebuildInfo);
+
+            CComPtr<ID3D12Resource> pBottomLevelResource;
+            D3D12_GPU_VIRTUAL_ADDRESS bottomLevelGpuVA; 
+            auto accelerationStructureDesc = CD3DX12_RESOURCE_DESC::Buffer(prebuildInfo.ResultDataMaxSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+            device.CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &accelerationStructureDesc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&pBottomLevelResource));
+            bottomLevelGpuVA = pBottomLevelResource->GetGPUVirtualAddress();
+
+            CComPtr<ID3D12Resource> pScratchBufferResource;
+            auto scratchBufferDesc = CD3DX12_RESOURCE_DESC::Buffer(prebuildInfo.ScratchDataSizeInBytes, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+            device.CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &scratchBufferDesc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&pScratchBufferResource));
+
+            CComPtr<ID3D12GraphicsCommandList> pCommandList;
+            m_d3d12Context.GetGraphicsCommandList(&pCommandList);
+
+            D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelDesc = {};
+            bottomLevelDesc.DestAccelerationStructureData.StartAddress = bottomLevelGpuVA;
+            bottomLevelDesc.DestAccelerationStructureData.SizeInBytes = prebuildInfo.ResultDataMaxSizeInBytes;
+            bottomLevelDesc.ScratchAccelerationStructureData.StartAddress = pScratchBufferResource->GetGPUVirtualAddress();
+            bottomLevelDesc.ScratchAccelerationStructureData.SizeInBytes = prebuildInfo.ScratchDataSizeInBytes;
+            bottomLevelDesc.Flags = buildFlags;
+            bottomLevelDesc.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
+            bottomLevelDesc.NumDescs = 1;
+            bottomLevelDesc.pGeometryDescs = &geometryDesc;
+            bottomLevelDesc.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+
+            pBuilder->BuildRaytracingAccelerationStructure(
+                pCommandList,
+                &bottomLevelDesc,
+                nullptr);
+
+            bottomLevelDesc.Flags |= D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE;
+
+            geometryDesc.Triangles.VertexBuffer.StartAddress = pUpdatedVertexBuffer->GetGPUVirtualAddress();
+
+            pBuilder->BuildRaytracingAccelerationStructure(
+                pCommandList,
+                &bottomLevelDesc,
+                nullptr);
+
+            pCommandList->Close();
+            m_d3d12Context.ExecuteCommandList(pCommandList);
+            m_d3d12Context.WaitForGpuWork();
+
+            std::unique_ptr<BYTE[]> outputData = std::unique_ptr<BYTE[]>(new BYTE[(UINT)prebuildInfo.ResultDataMaxSizeInBytes]);
+            Assert::AreNotEqual(outputData.get(), (BYTE *)nullptr, L"Failed to allocate output data");
+
+            m_d3d12Context.ReadbackResource(pBottomLevelResource, outputData.get(), (UINT)prebuildInfo.ResultDataMaxSizeInBytes);
+
+            const BYTE *pOutputBVH = outputData.get();
+            BVHOffsets offsets = *(BVHOffsets*)pOutputBVH;
+            AABBNode *pNodeArray = (AABBNode*)((BYTE *)pOutputBVH + offsets.offsetToBoxes);
+            Primitive *pPrimitiveArray = (Primitive*)((BYTE *)pOutputBVH + offsets.offsetToVertices);
+            UINT *pSortResults = (UINT *)((BYTE *)pOutputBVH + offsets.totalSize);
+            UINT *pParentIndexCache = pSortResults + numTriangles;
+
+            for (UINT i = 0; i < numTriangles; i++) {
+                UINT sortedIndex = pSortResults[i];
+                Triangle sortedTriangle = pPrimitiveArray[sortedIndex].triangle;
+                for (UINT vi = 0; vi < 3; vi++) {
+                    Assert::AreEqual(ReferenceVerticies1[i * 9 + vi * 3 + 0] + 1, sortedTriangle.v[vi].x, L"x not properly updated");
+                    Assert::AreEqual(ReferenceVerticies1[i * 9 + vi * 3 + 1] + 1, sortedTriangle.v[vi].y, L"y not properly updated");
+                    Assert::AreEqual(ReferenceVerticies1[i * 9 + vi * 3 + 2] + 1, sortedTriangle.v[vi].z, L"z not properly updated");
+                }
+            }
+        }
 
     private:
 #define TEST_EPSILON 0.001
@@ -1139,11 +1377,12 @@ namespace FallbackLayerUnitTests
             CpuGeometryDescriptor *pGeomDescs,
             UINT numDescs,
             std::unique_ptr<BYTE[]> &outputData,
-            D3D12_ELEMENTS_LAYOUT layoutToTest = D3D12_ELEMENTS_LAYOUT_ARRAY)
+            D3D12_ELEMENTS_LAYOUT layoutToTest = D3D12_ELEMENTS_LAYOUT_ARRAY,
+            D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_BUILD)
         {
             ID3D12Device &device = m_d3d12Context.GetDevice();
             CComPtr<ID3D12Resource> pResource;
-            m_pBuilderHelper->BuildBottomLevelAccelerationStructure(builder, pGeomDescs, numDescs, &pResource, layoutToTest);
+            m_pBuilderHelper->BuildBottomLevelAccelerationStructure(builder, pGeomDescs, numDescs, &pResource, layoutToTest, 0, buildFlags);
 
             outputData = std::unique_ptr<BYTE[]>(new BYTE[(UINT)pResource->GetDesc().Width]);
             Assert::AreNotEqual(outputData.get(), (BYTE *)nullptr, L"Failed to allocate output data");
@@ -2779,7 +3018,17 @@ namespace FallbackLayerUnitTests
             TestLoadPrimitives<Triangle>(TRIANGLE_TYPE);
         }
 
-        template <typename PrimitiveObjectType> void TestLoadPrimitives(UINT primitiveType) {
+        TEST_METHOD(LoadSortedAABBs)
+        {
+            TestLoadPrimitives<AABB>(PROCEDURAL_PRIMITIVE_TYPE, true);
+        }
+
+        TEST_METHOD(LoadSortedTriangles)
+        {
+            TestLoadPrimitives<Triangle>(TRIANGLE_TYPE, true);
+        }
+
+        template <typename PrimitiveObjectType> void TestLoadPrimitives(UINT primitiveType, bool testCachedSort=false) {
             const UINT primitivesPerGeometry = 4;
 
             D3D12_RAYTRACING_GEOMETRY_FLAGS geometryFlags[] =
@@ -2814,6 +3063,19 @@ namespace FallbackLayerUnitTests
 
             CComPtr<ID3D12Resource> pInputPrimitiveBuffer;
             m_d3d12Context.CreateResourceWithInitialData(inputPrimitives.data(), inputPrimitives.size() * primitiveSizeBytes, &pInputPrimitiveBuffer);
+
+            UINT cachedSortIndices[totalPrimCount];
+            D3D12_GPU_VIRTUAL_ADDRESS cachedSortBuffer = 0;
+            CComPtr<ID3D12Resource> pCachedSortBuffer;
+            if (testCachedSort) 
+            {
+                for (UINT i = 0; i < totalPrimCount; i++) 
+                {
+                    cachedSortIndices[i] = (i + 1) % totalPrimCount;
+                }
+                m_d3d12Context.CreateResourceWithInitialData(cachedSortIndices, totalPrimCount * sizeof(UINT), &pCachedSortBuffer);
+                cachedSortBuffer = pCachedSortBuffer->GetGPUVirtualAddress();
+            }
 
             CComPtr<ID3D12Resource> pOutputBuffer, pOutputMetadataBuffer;
 
@@ -2876,7 +3138,7 @@ namespace FallbackLayerUnitTests
                 totalPrimCount,
                 pOutputBuffer->GetGPUVirtualAddress(),
                 pOutputMetadataBuffer->GetGPUVirtualAddress(),
-                false);
+                cachedSortBuffer);
 
             pCommandList->Close();
             m_d3d12Context.ExecuteCommandList(pCommandList);
@@ -2889,26 +3151,27 @@ namespace FallbackLayerUnitTests
 
             for (UINT i = 0; i < totalPrimCount; i++)
             {
+                const UINT sortedIndex = cachedSortBuffer ? cachedSortIndices[i] : i;
                 const UINT geometryDescIndex = i / primitivesPerGeometry;
                 const UINT targetGeomFlag = geometryFlags[geometryDescIndex];
                 void *pUnwrappedPrimitive;
 
                 switch(primitiveType) {
                     case TRIANGLE_TYPE:
-                        pUnwrappedPrimitive = &outputPrimitives[i].triangle;
+                        pUnwrappedPrimitive = &outputPrimitives[sortedIndex].triangle;
                     break;
                     
                     case PROCEDURAL_PRIMITIVE_TYPE:
-                        pUnwrappedPrimitive = &outputPrimitives[i].aabb;
+                        pUnwrappedPrimitive = &outputPrimitives[sortedIndex].aabb;
                     break;
                 }
 
                 Assert::IsTrue(outputPrimitives[i].PrimitiveType == primitiveType, L"Loaded primitive is not properly marked with specified Primitive Type");
-                Assert::IsTrue(memcmp(&outputPrimitives[i].triangle, &inputPrimitives[i], sizeof(inputPrimitives[i])) == 0, L"Loaded primitive does not match the input primitive");
+                Assert::IsTrue(memcmp(pUnwrappedPrimitive, &inputPrimitives[i], sizeof(inputPrimitives[i])) == 0, L"Loaded primitive does not match the input primitive");
                 if (targetGeomFlag)
-                    Assert::IsTrue(outputMetadata[i].GeometryFlags == targetGeomFlag, L"Loaded primitive does not have correct geometry flag set");
+                    Assert::IsTrue(outputMetadata[sortedIndex].GeometryFlags == targetGeomFlag, L"Loaded primitive does not have correct geometry flag set");
                 else
-                    Assert::IsTrue(outputMetadata[i].GeometryFlags == 0, L"Loaded primitive does not have geometry flags cleared");
+                    Assert::IsTrue(outputMetadata[sortedIndex].GeometryFlags == 0, L"Loaded primitive does not have geometry flags cleared");
             }
         }
 
@@ -3011,11 +3274,12 @@ namespace FallbackLayerUnitTests
             rearrangeTrianglePass.Rearrange(
                 pCommandList,
                 sceneType,
+                numElements,
                 pInputBuffer->GetGPUVirtualAddress(),
-                numElements, pIndexBuffer->GetGPUVirtualAddress(),
-                pOutputBuffer->GetGPUVirtualAddress(),
                 pMetadataBuffer->GetGPUVirtualAddress(),
-                pOutputMetadata->GetGPUVirtualAddress());
+                pIndexBuffer->GetGPUVirtualAddress(),
+                pOutputBuffer->GetGPUVirtualAddress(),
+                pOutputMetadata->GetGPUVirtualAddress(), 0);
 
             D3D12_RESOURCE_BARRIER uavToCopySourceBarrier[] =
             {

@@ -135,6 +135,7 @@ namespace FallbackLayer
                 sceneAABB,
                 mortonCodeBuffer,
                 indexBuffer,
+                0,
                 hierarchyBuffer,
                 0,
                 nodeCountBuffer,
@@ -178,15 +179,13 @@ namespace FallbackLayer
         D3D12_GPU_VIRTUAL_ADDRESS sceneAABBScratchMemory = scratchGpuVA + scratchMemoryPartition.OffsetToSceneAABBScratchMemory;
         D3D12_GPU_VIRTUAL_ADDRESS indexBuffer = scratchGpuVA + scratchMemoryPartition.OffsetToIndexBuffer;
         D3D12_GPU_VIRTUAL_ADDRESS hierarchyBuffer = scratchGpuVA + scratchMemoryPartition.OffsetToHierarchy;
-
         D3D12_GPU_VIRTUAL_ADDRESS calculateAABBScratchBuffer = scratchGpuVA + scratchMemoryPartition.OffsetToCalculateAABBDispatchArgs;
         D3D12_GPU_VIRTUAL_ADDRESS nodeCountBuffer = scratchGpuVA + scratchMemoryPartition.OffsetToPerNodeCounter;
 
-        D3D12_GPU_VIRTUAL_ADDRESS outputLeafNodeAABBBuffer = pDesc->DestAccelerationStructureData.StartAddress + SizeOfBVHOffsets;
         D3D12_GPU_VIRTUAL_ADDRESS outputTriangleBuffer = pDesc->DestAccelerationStructureData.StartAddress + GetOffsetToPrimitives(totalTriangles);
         D3D12_GPU_VIRTUAL_ADDRESS outputMetadataBuffer = outputTriangleBuffer + GetOffsetFromPrimitivesToPrimitiveMetaData(totalTriangles);
-        D3D12_GPU_VIRTUAL_ADDRESS outputIndexBuffer = outputMetadataBuffer + GetOffsetFromPrimitiveMetaDataToSortedIndices(totalTriangles);
-        D3D12_GPU_VIRTUAL_ADDRESS outputAABBParentBuffer = outputIndexBuffer + GetOffsetFromSortedIndicesToAABBParents(totalTriangles);
+        D3D12_GPU_VIRTUAL_ADDRESS outputSortCacheBuffer = outputMetadataBuffer + GetOffsetFromPrimitiveMetaDataToSortedIndices(totalTriangles);
+        D3D12_GPU_VIRTUAL_ADDRESS outputAABBParentBuffer = outputSortCacheBuffer + GetOffsetFromSortedIndicesToAABBParents(totalTriangles);
 
         D3D12_GPU_DESCRIPTOR_HANDLE globalDescriptorHeap = D3D12_GPU_DESCRIPTOR_HANDLE();
 
@@ -197,9 +196,9 @@ namespace FallbackLayer
             pDesc,
             sceneType,
             totalTriangles,
-            performUpdate ? outputTriangleBuffer : scratchTriangleBuffer, 
-            performUpdate ? outputMetadataBuffer : scratchMetadataBuffer, 
-            performUpdate ? outputIndexBuffer    : 0,
+            performUpdate ? outputTriangleBuffer    : scratchTriangleBuffer, 
+            performUpdate ? outputMetadataBuffer    : scratchMetadataBuffer, 
+            performUpdate ? outputSortCacheBuffer   : 0,
             sceneAABBScratchMemory, 
             sceneAABB, 
             globalDescriptorHeap);
@@ -218,7 +217,8 @@ namespace FallbackLayer
                 sceneAABBScratchMemory,
                 sceneAABB,
                 mortonCodeBuffer,
-                m_updateAllowed ? outputIndexBuffer : indexBuffer,
+                indexBuffer,
+                m_updateAllowed ? outputSortCacheBuffer : 0,
                 hierarchyBuffer,
                 m_updateAllowed ? outputAABBParentBuffer : 0,
                 nodeCountBuffer,
@@ -293,6 +293,7 @@ namespace FallbackLayer
         D3D12_GPU_VIRTUAL_ADDRESS sceneAABB,
         D3D12_GPU_VIRTUAL_ADDRESS mortonCodeBuffer,
         D3D12_GPU_VIRTUAL_ADDRESS indexBuffer,
+        D3D12_GPU_VIRTUAL_ADDRESS outputIndexBuffer,
         D3D12_GPU_VIRTUAL_ADDRESS hierarchyBuffer,
         D3D12_GPU_VIRTUAL_ADDRESS outputAABBParentBuffer,
         D3D12_GPU_VIRTUAL_ADDRESS nodeCountBuffer,
@@ -318,12 +319,13 @@ namespace FallbackLayer
         m_rearrangePass.Rearrange(
             pCommandList,
             sceneType,
-            scratchElementBuffer,
             totalElements,
+            scratchElementBuffer,
+            scratchMetadataBuffer,
             indexBuffer,
             outputElementBuffer,
-            scratchMetadataBuffer,
-            outputMetadataBuffer);
+            outputMetadataBuffer,
+            outputIndexBuffer);
 
         m_constructHierarchyPass.ConstructHierarchy(
             pCommandList,
@@ -448,8 +450,8 @@ namespace FallbackLayer
             m_updateAllowed = (pDesc->Flags & D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE) != 0;
             if (m_updateAllowed) 
             {
-                pInfo->ResultDataMaxSizeInBytes += totalNumNodes * sizeof(UINT); // Parent indices for AABBNodes
                 pInfo->ResultDataMaxSizeInBytes += totalNumberOfTriangles * sizeof(UINT); // Saved sorted index buffer
+                pInfo->ResultDataMaxSizeInBytes += totalNumNodes * sizeof(UINT); // Parent indices for AABBNodes
             }
 
             pInfo->ScratchDataSizeInBytes = CalculateScratchMemoryUsage(Level::Bottom, totalNumberOfTriangles).TotalSize;

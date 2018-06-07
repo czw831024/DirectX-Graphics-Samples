@@ -54,7 +54,9 @@ namespace FallbackLayer
 
         const bool performUpdate = outputAABBParentBuffer != 0;
 
-        InputConstants constants = { numElements, (uint) performUpdate };
+        InputConstants constants = {};
+        constants.NumberOfElements = numElements;
+        constants.PerformUpdate = (UINT) performUpdate;
 
         pCommandList->SetComputeRootSignature(m_pRootSignature);
         pCommandList->SetComputeRoot32BitConstants(InputRootConstants, SizeOfInUint32(InputConstants), &constants, 0);
