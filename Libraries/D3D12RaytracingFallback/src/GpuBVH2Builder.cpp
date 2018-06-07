@@ -174,18 +174,21 @@ namespace FallbackLayer
 
         const bool performUpdate = m_updateAllowed && (pDesc->Flags & D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE);
 
+        // Load in the leaf-node elements of the BVH
         LoadBVHElements(
             pCommandList,
             pDesc,
             sceneType,
             numElements,
-            performUpdate ? street.outputElementBuffer   : street.scratchElementBuffer, 
+            performUpdate ? street.outputElementBuffer   : street.scratchElementBuffer, // If we're updating, write straight to output.
             performUpdate ? street.outputMetadataBuffer  : street.scratchMetadataBuffer, 
             performUpdate ? street.outputSortCacheBuffer : 0,
             street.sceneAABBScratchMemory,
             street.sceneAABB,
             globalDescriptorHeap);
 
+        // If we don't have PERFORM_UPDATE set, rebuild the entire hierarchy.
+        // (i.e. calc morton codes, sort, rearrange, build hierarchy, treelet reorder)
         if (!performUpdate) {
             BuildBVHHierarchy(
                 pCommandList,
@@ -207,6 +210,7 @@ namespace FallbackLayer
                 globalDescriptorHeap);
         }
 
+        // Fit AABBs around each node in the hierarchy.
         m_constructAABBPass.ConstructAABB(
             pCommandList,
             sceneType,
@@ -318,7 +322,7 @@ namespace FallbackLayer
             sceneType,
             mortonCodeBuffer,
             hierarchyBuffer,
-            outputAABBParentBuffer, // Store parent indices in hierarchy pass
+            outputAABBParentBuffer, // Store parent indices in hierarchy pass since AABBNodes don't store parent indices.
             globalDescriptorHeap,
             numElements);
 
