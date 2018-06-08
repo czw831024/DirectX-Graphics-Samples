@@ -45,7 +45,7 @@ namespace FallbackLayer
     {
         if (numElements == 0) return;
 
-        const bool performUpdate = cachedSortBuffer != 0; // PUT IN HLSL
+        const bool performUpdate = cachedSortBuffer != 0;
 
         pCommandList->SetComputeRootSignature(m_pRootSignature);
         ID3D12PipelineState *pLoadAABBPSO = nullptr;

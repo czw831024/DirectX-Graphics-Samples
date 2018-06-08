@@ -65,15 +65,14 @@ namespace FallbackLayer
 
         switch (pDesc->Type)
         {
-        case D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL:
-            BuildBottomLevelBVH(pCommandList, pDesc);
+            case D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL:
+                BuildBottomLevelBVH(pCommandList, pDesc);
             break;
-
-        case D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL:
-            BuildTopLevelBVH(pCommandList, pDesc, pCbvSrvUavDescriptorHeap);
+            case D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL:
+                BuildTopLevelBVH(pCommandList, pDesc, pCbvSrvUavDescriptorHeap);
             break;
-        default:
-            ThrowFailure(E_INVALIDARG, L"Unrecognized D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE provided");
+            default:
+                ThrowFailure(E_INVALIDARG, L"Unrecognized D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE provided");
         }
     }
 
@@ -96,8 +95,8 @@ namespace FallbackLayer
         street.calculateAABBScratchBuffer = scratchGpuVA + scratchMemoryPartition.OffsetToCalculateAABBDispatchArgs;
         street.nodeCountBuffer = scratchGpuVA + scratchMemoryPartition.OffsetToPerNodeCounter;
 
-
-        switch(bvhLevel) {
+        switch(bvhLevel) 
+        {
             case Level::Top:
             {
                 UINT offsetFromElementsToMetadata = GetOffsetFromLeafNodesToBottomLevelMetadata(numElements);
@@ -174,7 +173,7 @@ namespace FallbackLayer
 
         const bool performUpdate = m_updateAllowed && (pDesc->Flags & D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PERFORM_UPDATE);
 
-        // Load in the leaf-node elements of the BVH
+        // Load in the leaf-node elements of the BVH and calculate the entire scene's AABB.
         LoadBVHElements(
             pCommandList,
             pDesc,
@@ -238,6 +237,9 @@ namespace FallbackLayer
         switch(sceneType) 
         {
             case SceneType::BottomLevelBVHs:
+            // Note that the load instances pass does load metadata even though it doesn't take a metadata
+            // buffer address. Users don't specify BVH instance metadata, so the shader takes care of
+            // putting the metadata where it needs to go on its own.
             m_loadInstancesPass.LoadInstances(
                 pCommandList, 
                 elementBuffer, 
